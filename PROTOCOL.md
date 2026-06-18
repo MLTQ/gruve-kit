@@ -112,4 +112,5 @@ hub → {"t":"syncstate","state":{key:value,...}}
       (b) a deliberate crossed-write desync converges after one sync cycle
 - [ ] README states the conformance level
 
-Reference implementations: `sdk-js/` (L1+L2+L3), `sdk-rs/` (L1+L2), `sdk-py/` (L1+L2).
+Reference implementations: `sdk-js/` (L1+L2+L3), `sdk-rs/` (L1+L2), `sdk-py/` (L1+L2),
+`sdk-go/` (L1+L2).

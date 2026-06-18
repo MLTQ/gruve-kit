@@ -26,6 +26,7 @@ contract in `DESIGN-FOR-GRUVE.md` and **announcing** itself to the local agent.
 | `sdk-js/` | the JS SDK (`gruve-sdk`) — install as a `file:` dependency. The only frontend SDK: it runs in every browser/webview (Tauri, Electron, web) and is the one place L3 sessions live |
 | `sdk-rs/` | the Rust adapter (zero deps) — announce + dispatch from any Rust app (e.g. a Tauri backend) |
 | `sdk-py/` | the Python adapter (zero deps) — announce + dispatch from any Python backend (FastAPI/Flask, an ML server, a pipeline) |
+| `sdk-go/` | the Go adapter (zero deps) — announce + dispatch from any Go backend or headless service/daemon |
 | `PROTOCOL.md` | the adapter wire spec — what a gruve-sdk in ANY language must implement |
 
 ## The 10-minute proof (no network, no keys)
@@ -91,6 +92,13 @@ From **Rust** (`sdk-rs/` — e.g. a Tauri backend, after your HTTP surface is li
 ```rust
 let _gruve = gruve_sdk::Announce::app("myapp", "My App", UI_PORT)
     .upstream("api", API_PORT).hue(280).start();
+```
+
+From **Go** (`sdk-go/`, `go get github.com/MLTQ/gruve-kit/sdk-go` — great for headless services):
+```go
+h, _ := gruve.Announce(gruve.Options{ID: "myapp", Name: "My App", Port: UI_PORT,
+    Upstreams: map[string]int{"api": API_PORT}, Hue: 280})
+defer h.Stop()
 ```
 
 From **any other language** — it's one POST in a loop, so an SDK is ~20 lines (see `PROTOCOL.md`).
