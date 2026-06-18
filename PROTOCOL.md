@@ -5,7 +5,10 @@ reference implementation; this document is normative when they disagree. Everyth
 HTTP/WebSocket to the **local agent** at `http://127.0.0.1:8088` (override: `GRUVE_AGENT` env or
 equivalent). Apps never talk to the mesh directly — the agent owns transport and identity.
 
-Three conformance levels. An adapter states which it implements.
+Three conformance levels. An adapter states which it implements. In practice they split by
+runtime: a **backend** SDK (Rust, Python, Go, …) implements **L1+L2** and stays tiny; **L3**
+(shared-state sessions) runs in the browser, so it lives in the **JavaScript** SDK — which already
+serves every frontend (Tauri, Electron, web). There is no need for a second frontend language.
 
 ---
 
@@ -109,4 +112,4 @@ hub → {"t":"syncstate","state":{key:value,...}}
       (b) a deliberate crossed-write desync converges after one sync cycle
 - [ ] README states the conformance level
 
-Reference implementations: `sdk-js/` (L1+L2+L3), `sdk-rs/` (L1+L2).
+Reference implementations: `sdk-js/` (L1+L2+L3), `sdk-rs/` (L1+L2), `sdk-py/` (L1+L2).

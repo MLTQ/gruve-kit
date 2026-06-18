@@ -23,8 +23,9 @@ contract in `DESIGN-FOR-GRUVE.md` and **announcing** itself to the local agent.
 |---|---|
 | `README.md` | this guide |
 | `DESIGN-FOR-GRUVE.md` | the contract — the rules, each with the failure that produced it |
-| `sdk/` | the JS SDK (`gruve-sdk`) — install as a `file:` dependency |
-| `sdk-rs/` | the Rust adapter (zero deps) — announce + dispatch from any Rust app |
+| `sdk-js/` | the JS SDK (`gruve-sdk`) — install as a `file:` dependency. The only frontend SDK: it runs in every browser/webview (Tauri, Electron, web) and is the one place L3 sessions live |
+| `sdk-rs/` | the Rust adapter (zero deps) — announce + dispatch from any Rust app (e.g. a Tauri backend) |
+| `sdk-py/` | the Python adapter (zero deps) — announce + dispatch from any Python backend (FastAPI/Flask, an ML server, a pipeline) |
 | `PROTOCOL.md` | the adapter wire spec — what a gruve-sdk in ANY language must implement |
 
 ## The 10-minute proof (no network, no keys)
@@ -70,32 +71,39 @@ silently defeating runtime resolution. Env overrides must apply to the standalon
 
 **3. Announce from the backend.** Declare the UI port and any backend ports as named upstreams.
 
-From Node (the SDK works in Node 18+):
+Use the SDK for your backend's language — each one heartbeats, retries quietly, and withdraws on
+exit for you:
+
+From **Node** (`sdk-js/`, works in Node 18+ — this is also how an Electron main process announces):
 ```js
 import { announce } from "gruve-sdk";
 announce({ id: "myapp", name: "My App", port: UI_PORT, upstreams: { api: API_PORT }, hue: 280 });
 ```
 
-From Python (or anything — the protocol is one POST, re-sent as a heartbeat):
+From **Python** (`sdk-py/`, `pip install ./sdk-py`):
 ```python
-import threading, urllib.request, json
+import gruve_sdk
+gruve_sdk.announce(id="myapp", name="My App", port=UI_PORT,
+                   upstreams={"api": API_PORT}, hue=280)
+```
 
-def announce_to_gruve(app_id, name, port, upstreams=None, hue=280, ttl=60):
-    body = json.dumps({"id": app_id, "name": name, "port": port, "ttl": ttl,
-                       "hue": hue, "upstreams": upstreams or {}}).encode()
-    def beat():
-        req = urllib.request.Request("http://127.0.0.1:8088/gruve/announce", data=body,
-                                     headers={"content-type": "application/json"}, method="POST")
-        try:
-            urllib.request.urlopen(req, timeout=2)
-        except Exception:
-            pass  # agent not running — fine, we retry; the app works without Gruve
-        threading.Timer(ttl / 3, beat).start()
-    beat()
+From **Rust** (`sdk-rs/` — e.g. a Tauri backend, after your HTTP surface is listening):
+```rust
+let _gruve = gruve_sdk::Announce::app("myapp", "My App", UI_PORT)
+    .upstream("api", API_PORT).hue(280).start();
+```
+
+From **any other language** — it's one POST in a loop, so an SDK is ~20 lines (see `PROTOCOL.md`).
+The whole thing, in `curl`:
+```bash
+curl -X POST http://127.0.0.1:8088/gruve/announce -H 'content-type: application/json' \
+  -d '{"id":"myapp","name":"My App","port":9000,"upstreams":{"api":3030},"ttl":60}'
+# re-POST every ttl/3 seconds; DELETE /gruve/announce?id=myapp on clean shutdown
 ```
 
 Notes: the agent **refuses announces for ports that aren't actually listening** (start your server
-first), and the heartbeat must outlive you wandering off — that's why it lives in the backend.
+first), and the heartbeat must outlive you wandering off — that's why it lives in the backend, not a
+UI page (whose timers get throttled in the background).
 
 **4. Sub-path proof.** Friends load the app at `/peer/<net>/<node>/apps/<id>/` — it must not assume
 it lives at `/`. Vite: `base: "./"`. No absolute asset paths in HTML **or in code** —
@@ -137,6 +145,24 @@ backend behind upstreams, where it works for solo viewers too.
   their clicks.
 - Dev-server frontends (vite dev) can't be served under a sub-path — integrate against the
   **built** app.
+
+## Electron-specific notes
+
+Electron is two processes, and they map cleanly onto the kit:
+
+- **Announce from the main process, not the renderer.** The main process is Node, so it uses the
+  JS SDK directly — `import { announce } from "gruve-sdk"`. Don't announce from a renderer window;
+  it's a UI page, and its timers get throttled in the background until the registration expires.
+- **Serve the renderer over localhost HTTP.** Friends load your *renderer* over the mesh, so it has
+  to be reachable as HTTP — not `file://` or an `asar` path. In dev that's your vite/webpack
+  dev-server port; in production, serve the built renderer on a localhost port (a tiny `http`
+  server in `main`, or `serve-handler`) and announce that port. Announce the **built** app —
+  sub-path serving (`/apps/<id>/`) needs a real base, so set the bundler base to `./`.
+- **IPC stays home, like Tauri's `invoke()`.** `ipcRenderer`/`ipcMain` only exist for the local
+  user. Anything a remote viewer needs must be an HTTP **upstream** the renderer reaches via
+  `apiBase(...)` — not an IPC call.
+- The renderer is **Chromium**, so the L2/L3 frontend helpers (`apiBase`, `joinSession`) behave
+  exactly as they do on the web.
 
 ## Done when
 

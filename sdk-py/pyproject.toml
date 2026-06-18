@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gruve-sdk"
+version = "0.1.0"
+description = "Make your Python app discoverable on a Gruve mesh: announce + dispatch (adapter protocol L1+L2). Zero dependencies."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["gruve", "mesh", "p2p", "self-hosted", "announce", "tauri"]
+authors = [{ name = "Gruve" }]
+dependencies = []
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: System :: Networking",
+]
+
+[project.urls]
+Homepage = "https://getgruve.online"
+Source = "https://github.com/MLTQ/gruve-kit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gruve_sdk"]
