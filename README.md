@@ -4,9 +4,6 @@ You're holding everything needed to make an existing app **mesh-ready**: discove
 lobby, openable by friends over the network, with its backend reachable and (optionally) its state
 shared between viewers. No prior context required — this file is the context.
 
-> The **`gruve` agent** is a separate download — get it at **https://getgruve.online/download**.
-> This repo is the SDK and the contract; the steps below assume you've installed the agent.
-
 ## What Gruve is, in three sentences
 
 Gruve is a single binary (`gruve`) that runs on each person's machine: it joins a peer-to-peer
@@ -23,7 +20,8 @@ contract in `DESIGN-FOR-GRUVE.md` and **announcing** itself to the local agent.
 |---|---|
 | `README.md` | this guide |
 | `DESIGN-FOR-GRUVE.md` | the contract — the rules, each with the failure that produced it |
-| `sdk-js/` | the JS SDK (`gruve-sdk`) — install as a `file:` dependency. The only frontend SDK: it runs in every browser/webview (Tauri, Electron, web) and is the one place L3 sessions live |
+| `gruve` | the agent binary; also the linter: `./gruve doctor <dir>` |
+| `sdk/` | the JS SDK (`gruve-sdk`) — install as a `file:` dependency. The only frontend SDK: it runs in every browser/webview (Tauri, Electron, web) and is the one place L3 sessions live |
 | `sdk-rs/` | the Rust adapter (zero deps) — announce + dispatch from any Rust app (e.g. a Tauri backend) |
 | `sdk-py/` | the Python adapter (zero deps) — announce + dispatch from any Python backend (FastAPI/Flask, an ML server, a pipeline) |
 | `sdk-go/` | the Go adapter (zero deps) — announce + dispatch from any Go backend or headless service/daemon |
@@ -34,7 +32,7 @@ contract in `DESIGN-FOR-GRUVE.md` and **announcing** itself to the local agent.
 The agent is a complete local test harness — announced apps work **before joining any mesh**:
 
 ```bash
-gruve                        # the downloaded agent; lobby opens at http://localhost:8088 (ignore the join screen)
+./gruve                      # lobby opens at http://localhost:8088 (ignore the join screen)
 # in another terminal — pretend this is your app:
 python3 -m http.server 9000 &
 curl -X POST http://127.0.0.1:8088/gruve/announce -H 'content-type: application/json' \
@@ -75,7 +73,7 @@ silently defeating runtime resolution. Env overrides must apply to the standalon
 Use the SDK for your backend's language — each one heartbeats, retries quietly, and withdraws on
 exit for you:
 
-From **Node** (`sdk-js/`, works in Node 18+ — this is also how an Electron main process announces):
+From **Node** (`sdk/`, works in Node 18+ — this is also how an Electron main process announces):
 ```js
 import { announce } from "gruve-sdk";
 announce({ id: "myapp", name: "My App", port: UI_PORT, upstreams: { api: API_PORT }, hue: 280 });
@@ -113,11 +111,26 @@ Notes: the agent **refuses announces for ports that aren't actually listening** 
 first), and the heartbeat must outlive you wandering off — that's why it lives in the backend, not a
 UI page (whose timers get throttled in the background).
 
+**Give your tile a hero image (optional).** Lobby tiles have a cover area at the top; without an
+image the agent draws a textured placeholder in your `hue`. To supply your own, ship an image in
+your app and announce its path with `cover` — a path **relative to your app** (no `http://`, no
+leading `/`), exactly like any other asset (contract rule 3). The lobby resolves it against wherever
+the app is served, so the same value works locally and on a friend's machine:
+
+```js
+announce({ id: "myapp", name: "My App", port: UI_PORT, hue: 280, cover: "cover.webp" });
+// friends load it from /peer/<net>/<node>/apps/myapp/cover.webp — nothing to configure
+```
+
+Roughly 2:1 works best (it's shown `object-fit: cover`); keep it small since your app serves it. If
+the image is missing or the host is offline, the tile falls back to the textured placeholder. Every
+SDK takes the same `cover` (Rust `.cover("cover.webp")`, Python/Go `cover=`/`Cover:`).
+
 **4. Sub-path proof.** Friends load the app at `/peer/<net>/<node>/apps/<id>/` — it must not assume
 it lives at `/`. Vite: `base: "./"`. No absolute asset paths in HTML **or in code** —
 `loader.load("/models/x.obj")` 404s; use `"models/x.obj"` (relative to the page).
 
-**5. Run the linter.** `gruve doctor <built-app-dir>` — exit 0 or it tells you exactly what will
+**5. Run the linter.** `./gruve doctor <built-app-dir>` — exit 0 or it tells you exactly what will
 break for remote viewers (hardcoded localhost URLs, absolute asset paths, missing wiring). It knows
 the legitimate exemptions (SDK fallbacks).
 
@@ -174,7 +187,7 @@ Electron is two processes, and they map cleanly onto the kit:
 
 ## Done when
 
-- [ ] `gruve doctor <dist>` → "Contract holds" (exit 0)
+- [ ] `./gruve doctor <dist>` → "Contract holds" (exit 0)
 - [ ] App announced by its backend; tile visible in the lobby; survives 5 minutes untouched
 - [ ] App opens via `http://localhost:8088/apps/<id>/` — UI renders, assets load
 - [ ] Backend calls work through `/apps/<id>/__gruve/<upstream>/...`
@@ -183,5 +196,5 @@ Electron is two processes, and they map cleanly onto the kit:
 ## Joining a real mesh (the actual point, eventually)
 
 Get an invite phrase from a network host (four words, possibly `words@domain`). Run `./gruve`,
-type it into the join screen (`gruve`). Your announced apps appear on every member's lobby; theirs appear on
+type it into the join screen. Your announced apps appear on every member's lobby; theirs appear on
 yours. Nothing about your integration changes — that's the contract working.
